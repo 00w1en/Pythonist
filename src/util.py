@@ -161,15 +161,15 @@ def TurnOFF(pitch: int) -> None:
         SendInput(Keyboard(VK_LSHIFT, KEYEVENTF_KEYUP))
     SendInput(Keyboard(NOTES[pitch], KEYEVENTF_KEYUP))
 
-def ReadValue(file) -> int:
+def ReadValue(data) -> int:
     byte = 0x80
-    value = file.read(1)[0]
+    value = next(data)
 
     # Check MSB, if set, more bytes need reading
     if (value & 0x80):
         value &= 0x7F  # Mask out the MSB
         while (byte & 0x80):
-            byte = file.read(1)[0] 
+            byte = next(data)
             value = (value << 7) | (byte & 0x7F)  # Shift left and add the next 7 bits
 
     # Return final construction

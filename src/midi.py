@@ -1,6 +1,47 @@
 from struct import unpack
 from util import ReadValue
 
+# MIDI Event Types
+NOTE_OFF = 0x80
+NOTE_ON = 0x90
+KEY_PRESSURE = 0xA0
+CONTROL_CHANGE = 0xB0
+PROGRAM_CHANGE = 0xC0
+CHANNEL_PRESSURE = 0xD0
+PITCH_BEND = 0xE0
+SYSTEM_EXCLUSIVE_START = 0xF0
+SYSTEM_EXCLUSIVE_END = 0xF7
+
+# Meta Event Types
+META_EVENT = 0xFF
+SEQUENCE_NUMBER = 0x00
+TEXT_EVENT = 0x01
+COPYRIGHT_NOTICE = 0x02
+TRACK_NAME = 0x03
+INSTRUMENT_NAME = 0x04
+LYRICS = 0x05
+MARKER = 0x06
+CUE_POINT = 0x07
+MIDI_CHANNEL_PREFIX = 0x20
+MIDI_PORT = 0x21
+END_OF_TRACK = 0x2F
+TEMPO_CHANGE = 0x51
+SMPTE_OFFSET = 0x54
+TIME_SIGNATURE = 0x58
+KEY_SIGNATURE = 0x59
+SEQUENCER_SPECIFIC = 0x7F
+
+# Event Lengths (in bytes) for each MIDI Event Type
+EVENTS = {NOTE_OFF: 2, NOTE_ON: 2, KEY_PRESSURE: 2, CONTROL_CHANGE: 2, PROGRAM_CHANGE: 1, CHANNEL_PRESSURE: 1, PITCH_BEND: 2}
+META_EVENTS = (SEQUENCE_NUMBER, TEXT_EVENT, COPYRIGHT_NOTICE, TRACK_NAME, INSTRUMENT_NAME, LYRICS, MARKER, CUE_POINT, MIDI_CHANNEL_PREFIX, MIDI_PORT, END_OF_TRACK, TEMPO_CHANGE, SMPTE_OFFSET, TIME_SIGNATURE, KEY_SIGNATURE, SEQUENCER_SPECIFIC)
+
+class Event(object):
+    def __init__(self, status: int = META_EVENT, tick: int = 0, length: int = 1, data: list = []) -> None:
+        self.length = length
+        self.status = status
+        self.tick = tick
+        self.data = data
+
 class Midi(object):
     def __init__(self) -> None:
         self.tempo = 0
@@ -25,133 +66,88 @@ class Midi(object):
         print("[+] Tracks:", data[2])
         print("[+] Parts Per Quarter:", data[3])
 
-        # Loop through each track 
-        for track in range(data[2]):
+        tracks = []
+        for _ in range(data[2]):
             print("[+] NEW TRACK")
             trackid = file.read(4)  # Read track identifier
             if trackid != b'MTrk':  # Verify track header
                 file.close()
                 raise TypeError("Bad track header in MIDI file.")
 
-            # Track size 
             trksz = unpack(">l", file.read(4))[0]
             print("[+] Track size:", trksz)
 
-            trackend = False
-            self.tracks.append([])  # Initialize a new list for track events
-
-            # Process track events until the end of the track
-            while not trackend:
-                data = []
-                tick = ReadValue(file)    # Read delta time
-                status = file.read(1)[0]  # Read event status byte
-
-                # Check for Running Status
-                if (status < 0x80):
-                    status = self.tracks[track][-1][0]  # Use the last status byte
-                    file.seek(-1, 1)                    # Rewind one byte
-
-                if ((status & 0xF0) == 0x80):    # Note Off event 
-                    pitch = file.read(1)[0]
-                    velocity = file.read(1)[0]
-                    data.extend([pitch, velocity])
-                elif ((status & 0xF0) == 0x90):  # Note On event
-                    pitch = file.read(1)[0]
-                    velocity = file.read(1)[0]
-                    data.extend([pitch, velocity])
-                elif ((status & 0xF0) == 0xA0):  # Key Pressure event
-                    pitch = file.read(1)[0]
-                    velocity = file.read(1)[0]
-                    data.extend([pitch, velocity])
-                elif ((status & 0xF0) == 0xB0):  # Control Change event
-                    control = file.read(1)[0]
-                    value = file.read(1)[0]
-                    data.extend([control, value])
-                elif ((status & 0xF0) == 0xC0):  # Program Change event
-                    program = file.read(1)[0]
-                    data.append(program)
-                elif ((status & 0xF0) == 0xD0):  # Channel Pressure event
-                    channelpressure = file.read(1)[0]
-                    data.append(channelpressure)
-                elif ((status & 0xF0) == 0xE0):  # Pitch Bend event
-                    LS7B = file.read(1)[0]
-                    MS7B = file.read(1)[0]
-                    data.extend([LS7B, MS7B])
-                elif ((status & 0xF0) == 0xF0):  # Meta and System Exclusive events
-                    if (status == 0xFF):           # Meta Event
-                        msgtype = file.read(1)[0]  # Meta event type
-                        msglen = ReadValue(file)   # Meta event data length
-
-                        if msgtype == 0x00:
-                            print("Sequence Number:", file.read(1), file.read(1))
-                        elif msgtype == 0x01:
-                            print("Text:", file.read(msglen))
-                        elif msgtype == 0x02:
-                            print("Copyright:", file.read(msglen))
-                        elif msgtype == 0x03:
-                            print("Track Name:", file.read(msglen))
-                        elif msgtype == 0x04:
-                            print("Instrument Name:", file.read(msglen))
-                        elif msgtype == 0x05:
-                            print("Lyrics:", file.read(msglen))
-                        elif msgtype == 0x06:
-                            print("Marker:", file.read(msglen))
-                        elif msgtype == 0x07:
-                            print("Cue:", file.read(msglen))
-                        elif msgtype == 0x20:
-                            print("Prefix:", file.read(1))
-                        elif msgtype == 0x21:
-                            print("Prefix port:", file.read(1))
-                        elif msgtype == 0x2F:  # End of Track event
-                            trackend = True
-                        elif msgtype == 0x51:  # Tempo event
-                            if (self.tempo == 0):
-                                self.tempo |= (file.read(1)[0] << 16)
-                                self.tempo |= (file.read(1)[0] << 8)
-                                self.tempo |= (file.read(1)[0] << 0)
-                                bpm = (60000000 / self.tempo)
-                                print("Tempo:", self.tempo, "(", bpm, "bpm)")
-                            else:
-                                tempo = 0
-                                tempo |= (file.read(1)[0] << 16)
-                                tempo |= (file.read(1)[0] << 8)
-                                tempo |= (file.read(1)[0] << 0)
-                                bpm = (60000000 / tempo)
-                                print("Tempo:", tempo, "(", bpm, "bpm)")
-                        elif msgtype == 0x54:
-                            print("SMPTE: H:", file.read(1), "M:", file.read(1), "S:", file.read(1), "FR:", file.read(1), "FF:", file.read(1))
-                        elif msgtype == 0x58:
-                            print("Time Signature:", file.read(1), "/", (2 << file.read(1)[0]))
-                            print("ClocksPerTick:", file.read(1))
-                            print("32per24Clocks:", file.read(1))
-                        elif msgtype == 0x59:
-                            print("Key Signature:", file.read(1))
-                            print("Minor Key:", file.read(1))
-                        elif msgtype == 0x7F:
-                            print("Sequencer Specific:", file.read(msglen))
-                        else:
-                            print("Unrecognised MetaEvent:", msgtype)
-                    if (status == 0xF0):  # System Exclusive Begin
-                        print("System Exclusive Begin:", file.read(ReadValue(file)))
-                    if (status == 0xF7):  # System Exclusive End
-                        print("System Exclusive End:", file.read(ReadValue(file)))
-                else:
-                    print("Unrecognised Status Byte:", status)
-
-                # Append event (status, tick, data) to the track list
-                self.tracks[track].append(((status & 0xF0), tick, data))
+            tracks.append(iter(file.read(trksz)))
 
         file.close()
+
+        for trackdata in tracks:
+            self.tracks.append(self.parse_track(trackdata))
+
+    def parse_track(self, trackdata) -> list:
+        track = []  # Initialize a new list for track events
+        prevsts = 0
+        trackend = False
+
+        while not trackend:
+            data = []
+            tick = ReadValue(trackdata)  # Read delta time
+            status = next(trackdata)     # Read event status byte
+            event = Event(status=status, tick=tick)
+
+            # Process Meta Event 
+            if event.status == META_EVENT:
+                msgtype = next(trackdata)
+                if msgtype not in META_EVENTS:
+                    print("Unknown Meta MIDI Event:", msgtype)
+                else:
+                    event.length = ReadValue(trackdata)
+                    data = [next(trackdata) for _ in range(event.length)]
+                    if msgtype == END_OF_TRACK:
+                        trackend = True
+                    elif msgtype == TEMPO_CHANGE and self.tempo == 0:
+                        self.tempo |= (data[0] << 16)
+                        self.tempo |= (data[1] << 8)
+                        self.tempo |= (data[2] << 0)
+                        bpm = (60000000 / self.tempo)
+                        print("Tempo:", self.tempo, "(", bpm, "bpm)")
+
+            # Process System Exclusive Event
+            elif event.status == SYSTEM_EXCLUSIVE_START:
+                while True:
+                    datum = next(trackdata)
+                    if datum == SYSTEM_EXCLUSIVE_END:
+                        break
+                    data.append(datum)
+
+            # Process MIDI Event
+            else:
+                # Check for Running Status
+                if (event.status < NOTE_OFF):
+                    data.append(event.status)
+                    event.status = prevsts
+                    event.length = EVENTS[prevsts] - 1
+                else:
+                    event.length = EVENTS[(event.status & 0xF0)]
+
+                data += [next(trackdata) for _ in range(event.length)]
+
+                event.status &= 0xF0
+                prevsts = event.status
+
+            event.data = data
+            track.append(event)
+
+        return track
 
     def get_notes(self) -> list:
         notes = []
         for track in self.tracks:
             absolute_time = 0
             for event in track:
-                status, tick, data = event
-                absolute_time += tick
-                if status in (0x80, 0x90):
-                    notes.append((status, absolute_time, data))
+                absolute_time += event.tick
+                if event.status in (NOTE_OFF, NOTE_ON):
+                    notes.append((event.status, absolute_time, event.data))
 
         notes.sort(key=lambda note: note[1])
         return notes
