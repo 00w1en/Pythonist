@@ -3,9 +3,12 @@ from midi import Midi
 from util import TurnON, TurnOFF
 
 if __name__ == "__main__":
-    time.sleep(3)
+    filepath = input("MIDI file path: ")
+    delay = float(input("Start delay time: "))
+
     midi = Midi()
-    midi.parse_file("blacktrain.mid")
+    midi.parse_file(filepath)
+    time.sleep(delay)
 
     notes = midi.get_notes()
     
