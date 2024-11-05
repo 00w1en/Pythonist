@@ -1,6 +1,5 @@
-import time
+import time, util
 from midi import Midi
-from util import TurnON, TurnOFF
 
 if __name__ == "__main__":
     filepath = input("MIDI file path: ")
@@ -16,6 +15,9 @@ if __name__ == "__main__":
     active_notes = {}
 
     for note in notes:
+        if util.IsKeyPressed(util.VK_BACK):
+            break
+
         status, start_time, data = note
         pitch, velocity = data
         if not (36 <= pitch <= 96):
@@ -29,14 +31,17 @@ if __name__ == "__main__":
         if status == 0x90:
             if velocity == 0:
                 if pitch in active_notes:
-                    TurnOFF(pitch)
+                    util.TurnOFF(pitch)
                     del active_notes[pitch]
             else:
                 if pitch in active_notes:
-                    TurnOFF(pitch)
-                TurnON(pitch)
+                    util.TurnOFF(pitch)
+                util.TurnON(pitch)
                 active_notes[pitch] = current_time
         else:
             if pitch in active_notes:
-                TurnOFF(pitch)
+                util.TurnOFF(pitch)
                 del active_notes[pitch]
+
+    if util.IsKeyPressed(util.VK_LSHIFT):
+        util.SendInput(util.Keyboard(util.VK_LSHIFT, util.KEYEVENTF_KEYUP))
