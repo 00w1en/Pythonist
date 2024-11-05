@@ -8,6 +8,7 @@ ULONG_PTR = ctypes.POINTER(DWORD)
 INPUT_KEYBOARD = 1
 KEYEVENTF_KEYUP = 0x0002
 
+VK_BACK = 0x08
 VK_LSHIFT = 0xA0
 
 KEY_0 = 0x30
@@ -150,6 +151,9 @@ def SendInput(*inputs):
     
 def Keyboard(code, flags=0):
     return INPUT(INPUT_KEYBOARD, _INPUTunion(ki=KEYBDINPUT(code, 0, flags, 0, None)))
+
+def IsKeyPressed(code):
+    return (ctypes.windll.user32.GetAsyncKeyState(code) & 0x8000)
 
 def TurnON(pitch: int) -> None:
     if (pitch % 12) in BLACK_KEYS:
