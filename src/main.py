@@ -43,5 +43,5 @@ if __name__ == "__main__":
                 util.TurnOFF(pitch)
                 del active_notes[pitch]
 
-    if util.IsKeyPressed(util.VK_LSHIFT):
-        util.SendInput(util.Keyboard(util.VK_LSHIFT, util.KEYEVENTF_KEYUP))
+    for pitch in active_notes:
+        util.TurnOFF(pitch)
