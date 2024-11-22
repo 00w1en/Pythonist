@@ -10,4 +10,6 @@ I often thought about learning to play the piano, but I told myself it was too t
 4. Set the delay time before the program starts, during which you need to ensure the browser window with the site is active.
 5. Enjoy!
 
+A C++ version is also available: [plusist](https://github.com/00w1en/plusist).
+
 **P.S.** To end the program, press `Backspace`.
